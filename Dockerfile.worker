@@ -1,0 +1,25 @@
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# ffmpeg gives us ffprobe (audio validation today) and will back faster-whisper's
+# decoding on Day 2. Installed only in the worker image, not the API image,
+# since the API never touches raw audio bytes -- keeps that image smaller.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+COPY workers ./workers
+
+RUN useradd --create-home appuser
+USER appuser
+
+CMD ["celery", "-A", "workers.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
