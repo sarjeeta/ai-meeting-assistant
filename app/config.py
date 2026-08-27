@@ -42,8 +42,24 @@ class Settings(BaseSettings):
     qdrant_collection_name: str = "meeting_chunks"
 
     # --- LLM ---
+    # LLM_PROVIDER selects which vendor workers/tasks.py's LLMService talks to.
+    # Set to "gemini" if Anthropic credits run out -- no other code changes needed.
+    llm_provider: str = "gemini"
     anthropic_api_key: str
     llm_model: str = "claude-sonnet-4-6"
+    gemini_api_key: str
+    gemini_model: str = "gemini-3.6-flash"
+
+
+
+    # --- Speech-to-Text (faster-whisper) ---
+    # "base" is a reasonable CPU-speed/accuracy tradeoff for a resume project;
+    # drop to "tiny" for faster local iteration, or "small"/"medium" if you
+    # have a GPU worker in production. int8 compute_type keeps CPU inference
+    # fast at a small accuracy cost -- fine for meeting audio, not medical transcription.
+    stt_model_size: str = "base"
+    stt_device: str = "cpu"
+    stt_compute_type: str = "int8"
 
     # --- Auth ---
     jwt_secret_key: str

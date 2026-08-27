@@ -69,5 +69,7 @@ class MeetingResponse(BaseModel):
     created_at: str
     duration_seconds: float | None = None
     summary: str | None = None
+    key_decisions: list[str] | None = None
+    action_items: list[dict] | None = None
 
     model_config = {"from_attributes": True}

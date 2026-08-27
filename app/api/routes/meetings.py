@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_id
 from app.core.logging_config import get_logger
+from app.core.rate_limit import rate_limit
 from app.db import crud
 from app.db.session import get_db_session
 from app.schemas.meeting import (
@@ -37,10 +38,24 @@ def get_s3_service() -> S3Service:
     return S3Service()
 
 
+def _to_response(meeting) -> MeetingResponse:
+    return MeetingResponse(
+        id=meeting.id,
+        title=meeting.title,
+        status=meeting.status,
+        created_at=meeting.created_at.isoformat(),
+        duration_seconds=meeting.duration_seconds,
+        summary=meeting.summary,
+        key_decisions=meeting.key_decisions,
+        action_items=meeting.action_items,
+    )
+
+
 @router.post(
     "/upload-url",
     response_model=PresignedUploadResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit(key_prefix="upload_url", max_requests=10, window_seconds=60))],
 )
 async def create_upload_url(
     payload: PresignedUploadRequest,
@@ -117,14 +132,7 @@ async def confirm_upload(
     task = prepare_audio_for_transcription.delay(meeting_id)
     logger.info("meeting_confirmed_queued", meeting_id=meeting_id, celery_task_id=task.id)
 
-    return MeetingResponse(
-        id=updated.id,
-        title=updated.title,
-        status=updated.status,
-        created_at=updated.created_at.isoformat(),
-        duration_seconds=updated.duration_seconds,
-        summary=updated.summary,
-    )
+    return _to_response(updated)
 
 
 @router.get("/{meeting_id}", response_model=MeetingResponse)
@@ -137,14 +145,7 @@ async def get_meeting(
     if meeting is None or meeting.user_id != user_id:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
-    return MeetingResponse(
-        id=meeting.id,
-        title=meeting.title,
-        status=meeting.status,
-        created_at=meeting.created_at.isoformat(),
-        duration_seconds=meeting.duration_seconds,
-        summary=meeting.summary,
-    )
+    return _to_response(meeting)
 
 
 @router.get("", response_model=list[MeetingResponse])
@@ -155,14 +156,4 @@ async def list_meetings(
     offset: int = 0,
 ) -> list[MeetingResponse]:
     meetings = await crud.list_meetings_for_user(db, user_id, limit=limit, offset=offset)
-    return [
-        MeetingResponse(
-            id=m.id,
-            title=m.title,
-            status=m.status,
-            created_at=m.created_at.isoformat(),
-            duration_seconds=m.duration_seconds,
-            summary=m.summary,
-        )
-        for m in meetings
-    ]
+    return [_to_response(m) for m in meetings]

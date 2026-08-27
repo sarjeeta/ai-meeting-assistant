@@ -13,11 +13,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY workers ./workers
+COPY alembic.ini .
+COPY migrations ./migrations
 
 # The API imports workers.tasks to call .delay() and enqueue jobs -- it needs
 # the task module present even though it never executes tasks itself.
+# alembic.ini + migrations/ let us run `alembic upgrade head` from inside
+# this same container instead of needing a separate migration image.
 
-# Run as non-root user -- reduces blast radius if the container is compromised.
+# Run as non-root user
 RUN useradd --create-home appuser
 USER appuser
 
