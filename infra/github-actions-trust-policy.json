@@ -10,7 +10,7 @@
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:sarjeeta/ai-meeting-assistant:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": "repo:sarjeeta@136168907/ai-meeting-assistant@1342580106:ref:refs/heads/main"
         }
       }
     }
