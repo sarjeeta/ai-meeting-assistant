@@ -1,0 +1,106 @@
+{
+  "family": "ai-meeting-assistant-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::119033256221:role/ai-meeting-assistant-execution-role",
+  "taskRoleArn": "arn:aws:iam::119033256221:role/ai-meeting-assistant-task-role",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "119033256221.dkr.ecr.ap-south-1.amazonaws.com/ai-meeting-assistant-api:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "API_V1_PREFIX",
+          "value": "/api/v1"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "ap-south-1"
+        },
+        {
+          "name": "S3_BUCKET_NAME",
+          "value": "ai-meeting-assistant-audio-sarjeeta"
+        },
+        {
+          "name": "QDRANT_URL",
+          "value": "http://172.31.46.111:6333"
+        },
+        {
+          "name": "QDRANT_COLLECTION_NAME",
+          "value": "meeting_chunks"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "redis://ai-meeting-assistant-redis.si3pju.0001.aps1.cache.amazonaws.com:6379/0"
+        },
+        {
+          "name": "LLM_PROVIDER",
+          "value": "gemini"
+        },
+        {
+          "name": "LLM_MODEL",
+          "value": "claude-sonnet-4-6"
+        },
+        {
+          "name": "GEMINI_MODEL",
+          "value": "gemini-2.5-flash"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/database-url"
+        },
+        {
+          "name": "JWT_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/jwt-secret-key"
+        },
+	{ 
+          "name": "ANTHROPIC_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/anthropic-api-key-F49lUv"
+        },
+        { 
+          "name": "GEMINI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/gemini-api-key-IqWtZ0"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ai-meeting-assistant-api",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "api"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8000/healthz || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    }
+  ]
+}

@@ -1,25 +1,85 @@
-name: CI
+name: Deploy to AWS
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+
+# id-token: write is required for OIDC -- this is what lets GitHub Actions
+# assume an AWS IAM role without ever storing a long-lived AWS access key as
+# a GitHub secret. The trust relationship is configured on the AWS side (see
+# the deployment checklist) to only allow this specific repo/branch to assume it.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY_API: ai-meeting-assistant-api
+  ECR_REPOSITORY_WORKER: ai-meeting-assistant-worker
+  ECS_CLUSTER: ai-meeting-assistant-cluster
+  ECS_SERVICE_API: ai-meeting-assistant-api-service
+  ECS_SERVICE_WORKER: ai-meeting-assistant-worker-service
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          python-version: "3.11"
-          cache: "pip"
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Run tests
-        run: pytest -v
+      - name: Build and push API image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG -f Dockerfile .
+          docker push $REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG
+
+      - name: Build and push worker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY_WORKER:$IMAGE_TAG -f Dockerfile.worker .
+          docker push $REGISTRY/$ECR_REPOSITORY_WORKER:$IMAGE_TAG
+
+      - name: Render API task definition with new image
+        id: render-api
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: infra/ecs-task-def-api.json
+          container-name: api
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ github.sha }}
+
+      - name: Deploy API service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-api.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_API }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Render worker task definition with new image
+        id: render-worker
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: infra/ecs-task-def-worker.json
+          container-name: worker
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_WORKER }}:${{ github.sha }}
+
+      - name: Deploy worker service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-worker.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_WORKER }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

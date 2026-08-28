@@ -1,0 +1,102 @@
+{
+  "family": "ai-meeting-assistant-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "3072",
+  "executionRoleArn": "arn:aws:iam::119033256221:role/ai-meeting-assistant-execution-role",
+  "taskRoleArn": "arn:aws:iam::119033256221:role/ai-meeting-assistant-task-role",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "119033256221.dkr.ecr.ap-south-1.amazonaws.com/ai-meeting-assistant-worker:latest",
+      "essential": true,
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "ap-south-1"
+        },
+        {
+          "name": "S3_BUCKET_NAME",
+          "value": "ai-meeting-assistant-audio-sarjeeta"
+        },
+        {
+          "name": "QDRANT_URL",
+          "value": "http://172.31.46.111:6333"
+        },
+        {
+          "name": "QDRANT_COLLECTION_NAME",
+          "value": "meeting_chunks"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "redis://ai-meeting-assistant-redis.si3pju.0001.aps1.cache.amazonaws.com:6379/0"
+        },
+        {
+          "name": "CELERY_BROKER_URL",
+          "value": "redis://ai-meeting-assistant-redis.si3pju.0001.aps1.cache.amazonaws.com:6379/0"
+        },
+        {
+          "name": "CELERY_RESULT_BACKEND",
+          "value": "redis://ai-meeting-assistant-redis.si3pju.0001.aps1.cache.amazonaws.com:6379/1"
+        },
+        {
+          "name": "LLM_PROVIDER",
+          "value": "gemini"
+        },
+        {
+          "name": "LLM_MODEL",
+          "value": "claude-sonnet-4-6"
+        },
+        {
+          "name": "GEMINI_MODEL",
+          "value": "gemini-2.5-flash"
+        },
+        {
+          "name": "STT_MODEL_SIZE",
+          "value": "base"
+        },
+        {
+          "name": "STT_DEVICE",
+          "value": "cpu"
+        },
+        {
+          "name": "STT_COMPUTE_TYPE",
+          "value": "int8"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/database-url"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/anthropic-api-key"
+        },
+        {
+          "name": "GEMINI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:119033256221:secret:ai-meeting-assistant/gemini-api-key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ai-meeting-assistant-worker",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "worker"
+        }
+      }
+    }
+  ]
+}

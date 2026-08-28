@@ -24,8 +24,11 @@ class Settings(BaseSettings):
 
     # --- AWS / S3 ---
     aws_region: str
-    aws_access_key_id: str
-    aws_secret_access_key: str
+    # Optional: only needed for local dev (Docker Compose has no IAM role to
+    # assume). In ECS, leave these unset in the task definition entirely --
+    # boto3 automatically uses the task's attached IAM role instead.
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
     s3_bucket_name: str
     s3_presigned_url_expiry_seconds: int = 900
 

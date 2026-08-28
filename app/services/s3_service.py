@@ -40,15 +40,23 @@ class S3Service:
         settings = get_settings()
         self._bucket = settings.s3_bucket_name
         self._expiry = settings.s3_presigned_url_expiry_seconds
-        # signature_version 's3v4' is required for regions other than us-east-1
-        # and is generally the correct default for presigned URLs.
-        self._client = boto3.client(
-            "s3",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-            config=BotoConfig(signature_version="s3v4"),
-        )
+
+        # In production (ECS Fargate), the task has an IAM role attached and
+        # boto3's default credential chain picks up temporary credentials
+        # from the container credential provider automatically -- no static
+        # keys needed, nothing to leak, nothing to rotate. Locally (Docker
+        # Compose has no IAM role to assume), we fall back to explicit keys
+        # from .env. Passing empty strings to boto3 would be interpreted as
+        # real (invalid) credentials, so they're only included when present.
+        client_kwargs: dict = {
+            "region_name": settings.aws_region,
+            "config": BotoConfig(signature_version="s3v4"),
+        }
+        if settings.aws_access_key_id and settings.aws_secret_access_key:
+            client_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+            client_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+
+        self._client = boto3.client("s3", **client_kwargs)
 
     def _build_object_key(self, user_id: str, filename: str) -> str:
         # Namespacing by user_id keeps per-user data logically partitioned,
